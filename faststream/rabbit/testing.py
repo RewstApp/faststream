@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock
 import aiormq
 import anyio
 from aio_pika.message import IncomingMessage
+from aio_pika.pool import Pool
 from pamqp import commands as spec
 from pamqp.header import ContentHeader
 from typing_extensions import override
@@ -50,6 +51,11 @@ class TestRabbitBroker(TestBroker[RabbitBroker]):
             new_callable=AsyncMock,
         ), super()._patch_broker(broker):
             yield
+    @classmethod
+    def _patch_test_broker(cls, broker: RabbitBroker) -> None:
+        broker._channel_pool = AsyncMock(Pool)
+        broker.declarer = AsyncMock()
+        super()._patch_test_broker(broker)
 
     @staticmethod
     async def _fake_connect(broker: RabbitBroker, *args: Any, **kwargs: Any) -> None:
