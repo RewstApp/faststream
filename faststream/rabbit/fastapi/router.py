@@ -25,10 +25,7 @@ from faststream.broker.fastapi.router import StreamRouter
 from faststream.broker.utils import default_filter
 from faststream.rabbit.broker.broker import RabbitBroker as RB
 from faststream.rabbit.publisher.asyncapi import AsyncAPIPublisher
-from faststream.rabbit.schemas import (
-    RabbitExchange,
-    RabbitQueue,
-)
+from faststream.rabbit.schemas import RabbitExchange, RabbitQueue
 from faststream.rabbit.subscriber.asyncapi import AsyncAPISubscriber
 from faststream.types import EMPTY
 
@@ -45,13 +42,9 @@ if TYPE_CHECKING:
     from yarl import URL
 
     from faststream.asyncapi import schema as asyncapi
-    from faststream.broker.types import (
-        BrokerMiddleware,
-        CustomCallable,
-        Filter,
-        PublisherMiddleware,
-        SubscriberMiddleware,
-    )
+    from faststream.broker.types import (BrokerMiddleware, CustomCallable,
+                                         Filter, PublisherMiddleware,
+                                         SubscriberMiddleware)
     from faststream.rabbit.message import RabbitMessage
     from faststream.rabbit.schemas.reply import ReplyConfig
     from faststream.security import BaseSecurity
@@ -424,6 +417,14 @@ class RabbitRouter(StreamRouter["IncomingMessage"]):
                 """
             ),
         ] = Default(generate_unique_id),
+        max_connection_pool_size: Annotated[
+            int,
+            Doc("Max connection pool size"),
+        ] = 1,
+        max_channel_pool_size: Annotated[
+            int,
+            Doc("Max channel pool size"),
+        ] = 1,
     ) -> None:
         super().__init__(
             url,
@@ -436,6 +437,8 @@ class RabbitRouter(StreamRouter["IncomingMessage"]):
             fail_fast=fail_fast,
             reconnect_interval=reconnect_interval,
             max_consumers=max_consumers,
+            max_connection_pool_size=max_connection_pool_size,
+            max_channel_pool_size=max_channel_pool_size,
             app_id=app_id,
             graceful_timeout=graceful_timeout,
             decoder=decoder,
