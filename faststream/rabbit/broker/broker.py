@@ -244,6 +244,14 @@ class RabbitBroker(
             Iterable["Decorator"],
             Doc("Any custom decorator to apply to wrapped functions."),
         ] = (),
+        max_connection_pool_size: Annotated[
+            int,
+            Doc("Max connection pool size"),
+        ] = 1,
+        max_channel_pool_size: Annotated[
+            int,
+            Doc("Max channel pool size"),
+        ] = 1,
     ) -> None:
         security_args = parse_security(security)
 
@@ -265,6 +273,8 @@ class RabbitBroker(
         # respect ascynapi_url argument scheme
         built_asyncapi_url = urlparse(asyncapi_url)
         self.virtual_host = built_asyncapi_url.path
+        self.max_connection_pool_size = max_connection_pool_size
+        self.max_channel_pool_size = max_channel_pool_size
         if protocol is None:
             protocol = built_asyncapi_url.scheme
 
@@ -456,8 +466,6 @@ class RabbitBroker(
         reconnect_interval: "TimeoutType",
         timeout: "TimeoutType",
         ssl_context: Optional["SSLContext"],
-        max_connection_pool_size: int = 1,
-        max_channel_pool_size: int = 1,
     ) -> "RobustConnection":
         if self._connection_pool is None:
             self._connection_pool = Pool(
@@ -466,7 +474,7 @@ class RabbitBroker(
                     timeout=timeout,
                     ssl_context=ssl_context,
                 ),
-                max_size=max_connection_pool_size,
+                max_size=self.max_connection_pool_size,
             )
 
         if self._channel_pool is None:
@@ -477,7 +485,7 @@ class RabbitBroker(
                     lambda: get_channel(
                         cast("Pool[RobustConnection]", self._connection_pool)
                     ),
-                    max_size=max_channel_pool_size,
+                    max_size=self.max_channel_pool_size,
                 ),
             )
 
