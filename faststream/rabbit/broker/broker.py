@@ -19,6 +19,7 @@ from typing_extensions import Annotated, Doc, deprecated, override
 from faststream.__about__ import SERVICE_NAME
 from faststream.broker.message import gen_cor_id
 from faststream.exceptions import NOT_CONNECTED_YET
+from faststream.rabbit.broker.connection import ConnectionManager
 from faststream.rabbit.broker.logging import RabbitLoggingBroker
 from faststream.rabbit.broker.registrator import RabbitRegistrator
 from faststream.rabbit.helpers.declarer import RabbitDeclarer
@@ -53,29 +54,6 @@ if TYPE_CHECKING:
     from faststream.types import AnyDict, Decorator, LoggerProto
 
 
-async def get_connection(
-    url: str,
-    timeout: "TimeoutType",
-    ssl_context: Optional["SSLContext"],
-) -> "RobustConnection":
-    return cast(
-        "RobustConnection",
-        await connect_robust(
-            url,
-            timeout=timeout,
-            ssl_context=ssl_context,
-        ),
-    )
-
-
-async def get_channel(connection_pool: "Pool[RobustConnection]") -> "RobustChannel":
-    async with connection_pool.acquire() as connection:
-        return cast(
-            "RobustChannel",
-            await connection.channel(),
-        )
-
-
 class RabbitBroker(
     RabbitRegistrator,
     RabbitLoggingBroker,
@@ -86,8 +64,7 @@ class RabbitBroker(
     _producer: Optional["AioPikaFastProducer"]
 
     declarer: Optional[RabbitDeclarer]
-    _channel_pool: Optional["Pool[RobustChannel]"]
-    _connection_pool: Optional["Pool[RobustConnection]"]
+    _connection_manager: Optional["ConnectionManager"]
 
     def __init__(
         self,
@@ -316,8 +293,7 @@ class RabbitBroker(
         self.app_id = app_id
 
         self._channel = None
-        self._channel_pool = None
-        self._connection_pool = None
+        self._connection_manager = None
         self.declarer = None
 
     @property
@@ -466,29 +442,16 @@ class RabbitBroker(
         timeout: "TimeoutType",
         ssl_context: Optional["SSLContext"],
     ) -> "RobustConnection":
-        if self._connection_pool is None:
-            self._connection_pool = Pool(
-                lambda: get_connection(
-                    url=url,
-                    timeout=timeout,
-                    ssl_context=ssl_context,
-                ),
-                max_size=self.max_connection_pool_size,
+        if self._connection_manager is None:
+            self._connection_manager = ConnectionManager(
+                url=url,
+                timeout=timeout,
+                ssl_context=ssl_context,
+                connection_pool_size=self.max_connection_pool_size,
+                channel_pool_size=self.max_channel_pool_size,
             )
 
-        if self._channel_pool is None:
-            assert self._connection_pool is not None
-            self._channel_pool = cast(
-                Pool["RobustChannel"],
-                Pool(
-                    lambda: get_channel(
-                        cast("Pool[RobustConnection]", self._connection_pool)
-                    ),
-                    max_size=self.max_channel_pool_size,
-                ),
-            )
-
-        async with self._channel_pool.acquire() as channel:
+        async with self._connection_manager.acquire_channel() as channel:
             max_consumers = self._max_consumers
 
             declarer = self.declarer = RabbitDeclarer(channel)
@@ -517,15 +480,9 @@ class RabbitBroker(
         exc_val: Optional[BaseException] = None,
         exc_tb: Optional["TracebackType"] = None,
     ) -> None:
-        if self._channel_pool is not None:
-            if not self._channel_pool.is_closed:
-                await self._channel_pool.close()
-            self._channel_pool = None
-
-        if self._connection_pool is not None:
-            if not self._connection_pool.is_closed:
-                await self._connection_pool.close()
-            self._connection_pool = None
+        if self._connection_manager is not None:
+            await self._connection_manager.close()
+            self._connection_manager = None
 
         self.declarer = None
         self._producer = None
