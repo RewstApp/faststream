@@ -1,4 +1,5 @@
 import logging
+from inspect import Parameter
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -42,9 +43,13 @@ if TYPE_CHECKING:
     from yarl import URL
 
     from faststream.asyncapi import schema as asyncapi
-    from faststream.broker.types import (BrokerMiddleware, CustomCallable,
-                                         Filter, PublisherMiddleware,
-                                         SubscriberMiddleware)
+    from faststream.broker.types import (
+        BrokerMiddleware,
+        CustomCallable,
+        Filter,
+        PublisherMiddleware,
+        SubscriberMiddleware,
+    )
     from faststream.rabbit.message import RabbitMessage
     from faststream.rabbit.schemas.reply import ReplyConfig
     from faststream.security import BaseSecurity
