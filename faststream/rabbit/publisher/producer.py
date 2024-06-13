@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from types import TracebackType
 
     import aiormq
-    from aio_pika import IncomingMessage, RobustQueue
+    from aio_pika import IncomingMessage, RobustChannel, RobustQueue
     from aio_pika.abc import AbstractIncomingMessage, DateType, HeadersType, TimeoutType
     from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
 
@@ -87,15 +87,19 @@ class AioPikaFastProducer(ProducerProto):
         context: AsyncContextManager[
             Optional[MemoryObjectReceiveStream[IncomingMessage]]
         ]
+        channel: Optional["RobustChannel"]
+
         if rpc:
             if reply_to is not None:
                 raise WRONG_PUBLISH_ARGS
 
-            context = _RPCCallback(
-                self._rpc_lock,
-                await self.declarer.declare_queue(RABBIT_REPLY),
-            )
+            rmq_queue = await self.declarer.declare_queue(RABBIT_REPLY)
+            channel = cast("RobustChannel", rmq_queue.channel)
+            context = _RPCCallback(self._rpc_lock, rmq_queue)
+            reply_to = RABBIT_REPLY.name
+
         else:
+            channel = None
             context = fake_context()
 
         async with context as response_queue:
@@ -107,7 +111,7 @@ class AioPikaFastProducer(ProducerProto):
                 immediate=immediate,
                 timeout=timeout,
                 persist=persist,
-                reply_to=reply_to if response_queue is None else RABBIT_REPLY.name,
+                reply_to=reply_to,
                 headers=headers,
                 content_type=content_type,
                 content_encoding=content_encoding,
@@ -119,6 +123,7 @@ class AioPikaFastProducer(ProducerProto):
                 message_type=message_type,
                 user_id=user_id,
                 app_id=app_id,
+                channel=channel,
             )
 
             if response_queue is None:
@@ -208,6 +213,7 @@ class AioPikaFastProducer(ProducerProto):
         message_type: Optional[str],
         user_id: Optional[str],
         app_id: Optional[str],
+        channel: Optional["RobustChannel"],
     ) -> Union["aiormq.abc.ConfirmationFrameType", "SendableMessage"]:
         """Publish a message to a RabbitMQ exchange."""
         message = AioPikaParser.encode_message(
@@ -230,6 +236,7 @@ class AioPikaFastProducer(ProducerProto):
         exchange_obj = await self.declarer.declare_exchange(
             exchange=RabbitExchange.validate(exchange),
             passive=True,
+            channel=channel,
         )
 
         return await exchange_obj.publish(
