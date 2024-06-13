@@ -104,6 +104,7 @@ class LogicSubscriber(
         self,
         *,
         app_id: Optional[str],
+        max_consumers: Optional[int],
         virtual_host: str,
         declarer: "RabbitDeclarer",
         # basic args
@@ -123,6 +124,7 @@ class LogicSubscriber(
         self.app_id = app_id
         self.virtual_host = virtual_host
         self.declarer = declarer
+        self.__max_consumers = max_consumers
 
         super().setup(
             logger=logger,
@@ -144,6 +146,9 @@ class LogicSubscriber(
             raise SetupError("You should setup subscriber at first.")
 
         self._queue_obj = queue = await self.declarer.declare_queue(self.queue)
+
+        if self.__max_consumers is not None:
+            await queue.channel.set_qos(prefetch_count=self.__max_consumers)
 
         if (
             self.exchange is not None
