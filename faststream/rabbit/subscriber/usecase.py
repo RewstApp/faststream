@@ -67,6 +67,7 @@ class LogicSubscriber(
         title_: Optional[str],
         description_: Optional[str],
         include_in_schema: bool,
+        prefetch_count: Optional[int] = None,
     ) -> None:
         parser = AioPikaParser(pattern=queue.path_regex)
 
@@ -98,6 +99,8 @@ class LogicSubscriber(
         self.app_id = None
         self.virtual_host = ""
         self.declarer = None
+        
+        self.prefetch_count = prefetch_count
 
     @override
     def setup(  # type: ignore[override]
@@ -145,7 +148,7 @@ class LogicSubscriber(
         if self.declarer is None:
             raise SetupError("You should setup subscriber at first.")
 
-        self._queue_obj = queue = await self.declarer.declare_queue(self.queue)
+        self._queue_obj = queue = await self.declarer.declare_queue(self.queue, prefetch_count=self.prefetch_count)
 
         if self.__max_consumers is not None:
             await queue.channel.set_qos(prefetch_count=self.__max_consumers)

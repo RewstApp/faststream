@@ -462,7 +462,7 @@ class RabbitBroker(
         )
 
         if self.declarer is None:
-            self.declarer = RabbitDeclarer(connection_manager)
+            self.declarer = RabbitDeclarer(connection_manager, self._max_consumers)
 
         if self._producer is None:
             self._producer = AioPikaFastProducer(
@@ -498,8 +498,9 @@ class RabbitBroker(
                 await self.declare_exchange(publisher.exchange)
 
         for subscriber in self._subscribers.values():
+            prefetch_count = getattr(subscriber, "prefetch_count", None)
             self._log(
-                f"`{subscriber.call_name}` waiting for messages",
+                f"`{subscriber.call_name}` waiting for messages with prefetch count {prefetch_count}",
                 extra=subscriber.get_log_context(None),
             )
             await subscriber.start()

@@ -18,12 +18,14 @@ def create_subscriber(
     exchange: "RabbitExchange",
     consume_args: Optional["AnyDict"],
     reply_config: Optional["ReplyConfig"],
+
     # Subscriber args
     no_ack: bool,
     no_reply: bool,
     retry: Union[bool, int],
     broker_dependencies: Iterable["Depends"],
     broker_middlewares: Iterable["BrokerMiddleware[IncomingMessage]"],
+    prefetch_count: Optional[int] = None,
     # AsyncAPI args
     title_: Optional[str],
     description_: Optional[str],
@@ -53,4 +55,5 @@ def create_subscriber(
         title_=title_,
         description_=description_,
         include_in_schema=include_in_schema,
+        prefetch_count=prefetch_count,
     )
