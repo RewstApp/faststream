@@ -14,11 +14,13 @@ class RabbitDeclarer:
     __connection_manager: "ConnectionManager"
     __queues: Dict["RabbitQueue", "aio_pika.RobustQueue"]
     __exchanges: Dict["RabbitExchange", "aio_pika.RobustExchange"]
+    __default_prefetch_count: int
 
-    def __init__(self, connection_manager: "ConnectionManager") -> None:
+    def __init__(self, connection_manager: "ConnectionManager", default_prefetch_count) -> None:
         self.__connection_manager = connection_manager
         self.__queues = {}
         self.__exchanges = {}
+        self.__default_prefetch_count = default_prefetch_count
 
     async def declare_queue(
         self,
@@ -26,14 +28,19 @@ class RabbitDeclarer:
         passive: bool = False,
         *,
         channel: Optional["aio_pika.RobustChannel"] = None,
+        prefetch_count: Optional[int] = None,
     ) -> "aio_pika.RobustQueue":
         """Declare a queue."""
         if (queue_obj := self.__queues.get(queue)) is None:
             async with AsyncExitStack() as stack:
                 if channel is None:
                     channel = await stack.enter_async_context(
-                        self.__connection_manager.acquire_channel()
+                        self.__connection_manager.acquire_channel(queue_name=queue.name)
                     )
+
+                pf_count = prefetch_count if prefetch_count is not None else self.__default_prefetch_count
+                if pf_count:
+                    await channel.set_qos(prefetch_count=pf_count)
 
                 self.__queues[queue] = queue_obj = cast(
                     "aio_pika.RobustQueue",
