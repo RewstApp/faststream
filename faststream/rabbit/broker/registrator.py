@@ -67,6 +67,8 @@ class RabbitRegistrator(ABCBroker["IncomingMessage"]):
                 "Argument will be removed in **FastStream 0.6.0**."
             ),
         ] = None,
+        # channel arguments
+        prefetch_count: Annotated[int, Doc("RabbitMQ channel prefetch count.")],
         # broker arguments
         dependencies: Annotated[
             Iterable["Depends"],
@@ -140,6 +142,7 @@ class RabbitRegistrator(ABCBroker["IncomingMessage"]):
                     retry=retry,
                     broker_middlewares=self._middlewares,
                     broker_dependencies=self._dependencies,
+                    prefetch_count=prefetch_count,
                     # AsyncAPI
                     title_=title,
                     description_=description,

@@ -45,6 +45,8 @@ class ConnectionManager:
             max_size=channel_pool_size,
         )
 
+        self._queue_channels: dict[str, "RobustChannel"] = {}
+
     async def get_connection(self) -> "RobustConnection":
         return await self._connection_pool._get()
 
@@ -57,9 +59,15 @@ class ConnectionManager:
         return await self._channel_pool._get()
 
     @asynccontextmanager
-    async def acquire_channel(self) -> AsyncIterator["RobustChannel"]:
-        async with self._channel_pool.acquire() as channel:
-            yield channel
+    async def acquire_channel(self, queue_name: Optional[str] = None) -> AsyncIterator["RobustChannel"]:
+        if queue_name is not None:
+            if queue_name not in self._queue_channels:
+                self._queue_channels[queue_name] = await self._channel_pool._get()
+            
+            yield self._queue_channels[queue_name]
+        else:
+            async with self._channel_pool.acquire() as channel:
+                yield channel
 
     async def _get_channel(
         self,
@@ -80,6 +88,10 @@ class ConnectionManager:
             return channel
 
     async def close(self) -> None:
+        for channel in self._queue_channels.values():
+            if not channel.is_closed:
+                await channel.close()
+
         if not self._channel_pool.is_closed:
             await self._channel_pool.close()
 
