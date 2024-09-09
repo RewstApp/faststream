@@ -812,6 +812,21 @@ class RabbitBroker(
         """Declares exchange object in **RabbitMQ**."""
         assert self.declarer, NOT_CONNECTED_YET  # nosec B101
         return await self.declarer.declare_exchange(exchange)
+    
+    async def bind_queue(
+        self,
+        queue: Annotated[
+            "RabbitQueue",
+            Doc("Queue object to bind."),
+        ],
+        exchange: Annotated[
+            "RabbitExchange",
+            Doc("Exchange object to bind."),
+        ],
+    ) -> None:
+        """Bind queue to exchange."""
+        assert self.declarer, NOT_CONNECTED_YET # nosec B101
+        await self.declarer.bind_queue(queue, exchange)
 
     @override
     async def ping(self, timeout: Optional[float]) -> bool:

@@ -109,3 +109,21 @@ class RabbitDeclarer:
                     )
 
         return exch  # type: ignore[return-value]
+
+    async def bind_queue(
+        self,
+        queue: "RabbitQueue",
+        exchange: "RabbitExchange",
+    ) -> None:
+        """Bind a queue to an exchange."""
+
+        exch = await self.declare_exchange(exchange)
+        q = await self.declare_queue(queue)
+
+        await q.bind(
+            exchange=exch,
+            routing_key=queue.routing,
+            arguments=queue.bind_arguments,
+            timeout=queue.timeout,
+            robust=queue.robust,
+        )
