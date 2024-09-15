@@ -42,7 +42,7 @@ class TestRabbitBroker(TestBroker[RabbitBroker]):
     def _patch_broker(self, broker: RabbitBroker) -> Generator[None, None, None]:
         with mock.patch.object(
             broker,
-            "_channel",
+            "_connection",
             new_callable=AsyncMock,
         ), mock.patch.object(
             broker,
