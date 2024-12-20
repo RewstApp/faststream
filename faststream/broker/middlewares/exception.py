@@ -77,6 +77,15 @@ class BaseExceptionMiddleware(BaseMiddleware):
                     return await handler(exc)
 
             raise exc
+        
+        except BaseException as exc:
+            exc_type = type(exc)
+
+            for handler_type, handler in self._handlers:
+                if issubclass(exc_type, handler_type):
+                    return await handler(exc)
+
+            raise exc
 
     async def after_processed(
         self,
@@ -160,6 +169,13 @@ class ExceptionMiddleware:
         exc: Type[Exception],
         publish: Literal[True],
     ) -> Callable[[PublishingExceptionHandler], PublishingExceptionHandler]: ...
+
+    @overload
+    def add_handler(
+        self,
+        exc: Type[BaseException],
+        publish: bool = False,
+    ) -> Callable[[GeneralExceptionHandler], GeneralExceptionHandler]: ...
 
     def add_handler(
         self,
