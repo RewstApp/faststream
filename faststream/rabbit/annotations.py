@@ -15,11 +15,13 @@ __all__ = (
     "RabbitBroker",
     "RabbitMessage",
     "RabbitProducer",
+    "RabbitMessageHeaders",
 )
 
 RabbitMessage = Annotated[RM, Context("message")]
 RabbitBroker = Annotated[RB, Context("broker")]
 RabbitProducer = Annotated[AioPikaFastProducer, Context("broker._producer")]
+RabbitMessageHeaders = Annotated[dict[str, str], Context("message.headers")]
 
 # NOTE: transaction is not for the public usage yet
 # async def _get_transaction(connection: Connection) -> RabbitTransaction:
