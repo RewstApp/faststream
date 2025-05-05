@@ -69,14 +69,49 @@ class ConnectionManager:
 
     @asynccontextmanager
     async def acquire_channel(self, queue_name: Optional[str] = None) -> AsyncIterator["RobustChannel"]:
+        max_attempts = 3
+
         if queue_name is not None:
-            if queue_name not in self._queue_channels:
-                self._queue_channels[queue_name] = await self._consumer_channel_pool._get()
+            attempts = 0
+            channel = None
+
+            while attempts < max_attempts:
+                if queue_name in self._queue_channels:
+                    channel = self._queue_channels[queue_name]
+                else:
+                    channel = await self._consumer_channel_pool._get()
+                    self._queue_channels[queue_name] = channel
+                
+                if not (hasattr(channel, 'is_closed') and channel.is_closed):
+                    # channel is not closed, we can use it
+                    break
+
+                channel = await self._consumer_channel_pool._get()
+                self._queue_channels[queue_name] = channel
+                attempts += 1
+
+            if attempts == max_attempts:
+                raise Exception(
+                    "Failed to acquire an open consumer channel after multiple attempts."
+                )
             
             yield self._queue_channels[queue_name]
         else:
-            async with self._channel_pool.acquire() as channel:
-                yield channel
+            attempts = 0
+
+            while attempts < max_attempts:
+                async with self._channel_pool.acquire() as pool_channel:
+                    if not (hasattr(pool_channel, 'is_closed') and pool_channel.is_closed):
+                        # channel is not closed, we can use it
+                        yield pool_channel
+                        return
+
+                attempts += 1
+
+            # if we reach here, it means all attempts failed
+            raise Exception(
+                "Failed to acquire an open channel after multiple attempts."
+            )
 
     async def _get_channel(
         self,
